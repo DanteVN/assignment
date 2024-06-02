@@ -6,11 +6,16 @@ import './App.css';
 const initialCourses = {
     'year1semester1': [
         { id: 'csc101', name: 'Introduction to Programming', credits: 3 },
-        { id: 'math101', name: 'Calculus I', credits: 4, prerequisites: ['math102'], inversePrerequisites: true }
+	{ id: 'csc102', name: 'Introduction', credits: 3 },
+	{ id: 'csc103', name: 'Programming', credits: 3 },
+	{ id: 'gen101', name: 'PE', credits: 3 },
+        { id: 'math101', name: 'Calculus I', credits: 3, prerequisites: ['math102'], inversePrerequisites: true }
     ],
     'year1semester2': [
-        { id: 'csc102', name: 'Data Structures', credits: 3 },
-        { id: 'math102', name: 'Calculus II', credits: 4, prerequisites: ['math101'] }
+        { id: 'csc110', name: 'Data Structures', credits: 3 },
+	{ id: 'gen111', name: 'Ethics', credits: 3 },
+	{ id: 'lng101', name: 'Talking', credits: 3 },
+        { id: 'math102', name: 'Calculus II', credits: 3, prerequisites: ['math101'] }
     ],
 };
 
@@ -24,54 +29,56 @@ function arePrerequisitesMet(courseId, destinationId, allCourses) {
         const prereqCourse = Object.values(allCourses).flat().find(c => c.id === prereq);
         const prereqIndex = prereqCourse ? parseInt(Object.keys(allCourses).find(key => allCourses[key].includes(prereqCourse)).replace(/[^\d]/g, ''), 10) : null;
         if (course.inversePrerequisites) {
-            return prereqIndex && prereqIndex > destinationIndex; // Ensures that the prerequisite course comes after
+            return prereqIndex && prereqIndex > destinationIndex;
         }
         return prereqIndex && prereqIndex < destinationIndex;
     });
 }
 
+// Calculate the total credits for each semester
+const getTotalCredits = (semesterCourses) => {
+    return semesterCourses.reduce((total, course) => total + course.credits, 0);
+};
+
 function App() {
     const [courses, setCourses] = useState(initialCourses);
 
     const onDragEnd = (result) => {
-        console.log('Drag result:', result);  // Debug output
         const { source, destination } = result;
         if (!destination) return; // Dropped outside any droppable area
 
-        // Check if prerequisites are met before proceeding
-        if (!arePrerequisitesMet(result.draggableId, destination.droppableId, courses)) {
-            alert("You cannot take this course as it has a prerequisite.");
-            return; // Exit if prerequisites not met
+        if (source.droppableId === destination.droppableId && source.index === destination.index) {
+            return; // No movement happened
         }
 
         const start = courses[source.droppableId];
         const finish = courses[destination.droppableId];
 
-        if (source.droppableId === destination.droppableId) {
-            const newCourseItems = Array.from(start);
-            const [removed] = newCourseItems.splice(source.index, 1);
-            newCourseItems.splice(destination.index, 0, removed);
+        const startCourseItems = Array.from(start);
+        const finishCourseItems = source.droppableId === destination.droppableId ? startCourseItems : Array.from(finish);
+        const [removed] = startCourseItems.splice(source.index, 1);
 
-            const newState = {
-                ...courses,
-                [source.droppableId]: newCourseItems,
-            };
+        finishCourseItems.splice(destination.index, 0, removed);
 
-            setCourses(newState);
-        } else {
-            const startCourseItems = Array.from(start);
-            const finishCourseItems = Array.from(finish);
-            const [removed] = startCourseItems.splice(source.index, 1);
-            finishCourseItems.splice(destination.index, 0, removed);
-
-            const newState = {
-                ...courses,
-                [source.droppableId]: startCourseItems,
-                [destination.droppableId]: finishCourseItems,
-            };
-
-            setCourses(newState);
+        if (getTotalCredits(finishCourseItems) > 21) {
+            alert("A semester cannot have more than 21 credits.");
+            return; // Do not update state, effectively reverting the drag
         }
+
+        const newState = {
+            ...courses,
+            [source.droppableId]: startCourseItems,
+            [destination.droppableId]: finishCourseItems,
+        };
+
+        if (source.droppableId !== destination.droppableId) {
+            if (!arePrerequisitesMet(result.draggableId, destination.droppableId, newState)) {
+                alert("You cannot take this course as it has a prerequisite.");
+                return; // Exit if prerequisites not met
+            }
+        }
+
+        setCourses(newState);
     };
 
     const generatePDF = () => {
@@ -97,7 +104,7 @@ function App() {
                     <Droppable droppableId={semesterId} key={semesterId}>
                         {(provided) => (
                             <div ref={provided.innerRef} {...provided.droppableProps} className="semester">
-                                <h3>{semesterId.replace('year', 'Year ').replace('semester', ' Semester ')}</h3>
+                                <h3>{semesterId.replace('year', 'Year ').replace('semester', ' Semester ')} - {getTotalCredits(semesterCourses)} Credits</h3>
                                 {semesterCourses.map((course, index) => (
                                     <Draggable key={course.id} draggableId={course.id} index={index}>
                                         {(provided) => (
