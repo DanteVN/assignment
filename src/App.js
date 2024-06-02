@@ -6,13 +6,29 @@ import './App.css';
 const initialCourses = {
     'year1semester1': [
         { id: 'csc101', name: 'Introduction to Programming', credits: 3 },
-        { id: 'math101', name: 'Calculus I', credits: 4 }
+        { id: 'math101', name: 'Calculus I', credits: 4, prerequisites: ['math102'], inversePrerequisites: true }
     ],
     'year1semester2': [
         { id: 'csc102', name: 'Data Structures', credits: 3 },
-        { id: 'math102', name: 'Calculus II', credits: 4 }
+        { id: 'math102', name: 'Calculus II', credits: 4, prerequisites: ['math101'] }
     ],
 };
+
+// Helper function to check if prerequisites are met
+function arePrerequisitesMet(courseId, destinationId, allCourses) {
+    const course = Object.values(allCourses).flat().find(c => c.id === courseId);
+    if (!course || !course.prerequisites) return true;
+
+    const destinationIndex = parseInt(destinationId.replace(/[^\d]/g, ''), 10);
+    return course.prerequisites.every(prereq => {
+        const prereqCourse = Object.values(allCourses).flat().find(c => c.id === prereq);
+        const prereqIndex = prereqCourse ? parseInt(Object.keys(allCourses).find(key => allCourses[key].includes(prereqCourse)).replace(/[^\d]/g, ''), 10) : null;
+        if (course.inversePrerequisites) {
+            return prereqIndex && prereqIndex > destinationIndex; // Ensures that the prerequisite course comes after
+        }
+        return prereqIndex && prereqIndex < destinationIndex;
+    });
+}
 
 function App() {
     const [courses, setCourses] = useState(initialCourses);
@@ -22,8 +38,10 @@ function App() {
         const { source, destination } = result;
         if (!destination) return; // Dropped outside any droppable area
 
-        if (source.droppableId === destination.droppableId && source.index === destination.index) {
-            return;
+        // Check if prerequisites are met before proceeding
+        if (!arePrerequisitesMet(result.draggableId, destination.droppableId, courses)) {
+            alert("You cannot take this course as it has a prerequisite.");
+            return; // Exit if prerequisites not met
         }
 
         const start = courses[source.droppableId];
